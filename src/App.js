@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import './App.css';
 import FlexSearch from 'flexsearch';
 
+import debounce from 'lodash.debounce';
+
 import Articles from './styles.json';
 
 const index = new FlexSearch({
@@ -29,25 +31,31 @@ const Article = React.memo(function({ article, visible }) {
 
 const hiddenStyle = { style: { display: 'none' } };
 
+const performSearch = (searchText, setIds) => {
+	let searchResultIds;
+	console.log('searchText', searchText, searchText.length);
+	console.time('search');
+	if (searchText === '') {
+		searchResultIds = Articles.map((style) => style.id);
+		console.log('performSearch: no search');
+	} else {
+		searchResultIds = index.search(searchText);
+		console.log('performSearch got', searchResultIds.length);
+	}
+	const newIds = {};
+	searchResultIds.forEach((id) => (newIds[id] = true));
+	console.timeEnd('search');
+	setIds(newIds);
+};
+
+const debouncedPerformSearch = debounce(performSearch, 200, {});
+
 function App() {
 	const [ searchText, setSearchText ] = useState('');
 	const [ ids, setIds ] = useState({});
-	const performSearch = () => {
-		let searchResultIds;
-		console.log('searchText', searchText, searchText.length);
-		if (searchText === '') {
-			searchResultIds = Articles.map((style) => style.id);
-			console.log('performSearch: no search');
-		} else {
-			searchResultIds = index.search(searchText);
-			console.log('performSearch got', searchResultIds.length);
-		}
-		const newIds = {};
-		searchResultIds.forEach((id) => (newIds[id] = true));
-		setIds(newIds);
-	};
 
-	useEffect(performSearch, []);
+	// useEffect(performSearch, []);
+	useEffect(() => debouncedPerformSearch('', setIds), []);
 
 	return (
 		<div className="App">
@@ -58,8 +66,9 @@ function App() {
 						type="text"
 						value={searchText}
 						onChange={(e) => {
-							setSearchText(e.target.value);
-							performSearch();
+							const newSearchText = e.target.value;
+							setSearchText(newSearchText);
+							debouncedPerformSearch(newSearchText, setIds);
 						}}
 					/>
 				</div>
