@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import './App.css';
 import FlexSearch from 'flexsearch';
-
 import debounce from 'lodash.debounce';
+import { observable, decorate } from 'mobx';
 
+import './App.css';
 import Articles from './styles.json';
 
 const index = new FlexSearch({
@@ -15,11 +15,7 @@ const index = new FlexSearch({
 	cache: false,
 });
 
-Articles.forEach((article) => {
-	index.add(article.id, article.productDisplayName);
-});
-
-const Article = React.memo(function({ article, visible }) {
+const Article = React.memo(function({ article }) {
 	return (
 		<React.Fragment>
 			<td>{article.id}</td>
@@ -31,9 +27,43 @@ const Article = React.memo(function({ article, visible }) {
 
 const hiddenStyle = { style: { display: 'none' } };
 
+class ObservableArticle {
+	constructor(article) {
+		this.id = article.id;
+		this.productDisplayName = article.productDisplayName;
+	}
+}
+
+decorate(ObservableArticle, {
+	id: observable,
+	productDisplayName: observable,
+});
+
+let observableArticles;
+
+const makeObservableArticles = () => {
+	console.time('makeObservables');
+	observableArticles = Articles.map((article) => {
+		return new ObservableArticle(article);
+	});
+	console.timeEnd('makeObservables');
+	console.log('Got', observableArticles.length, 'objects');
+};
+
+makeObservableArticles();
+
+const indexArticles = () => {
+	console.time('indexArticles');
+	observableArticles.forEach((article) => {
+		index.add(article.id, article.productDisplayName);
+	});
+	console.timeEnd('indexArticles');
+};
+
+indexArticles();
+
 const performSearch = (searchText, setIds) => {
 	let searchResultIds;
-	console.log('searchText', searchText, searchText.length);
 	console.time('search');
 	if (searchText === '') {
 		searchResultIds = Articles.map((style) => style.id);
@@ -54,7 +84,6 @@ function App() {
 	const [ searchText, setSearchText ] = useState('');
 	const [ ids, setIds ] = useState({});
 
-	// useEffect(performSearch, []);
 	useEffect(() => debouncedPerformSearch('', setIds), []);
 
 	return (
@@ -74,7 +103,7 @@ function App() {
 				</div>
 				<table>
 					<tbody>
-						{Articles.map((article) => {
+						{observableArticles.map((article) => {
 							return (
 								<tr key={article.id} {...ids[article.id] || hiddenStyle}>
 									<Article key={article.id} article={article} />
